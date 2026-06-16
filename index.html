@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情報セキュリティ・ガバナンス台帳 | ワイズ</title>
+<style>
+  :root{--navy:#2c3e50;--mint:#16a085;--bg:#f5f7fa;--surface:#fff;--border:#e1e6eb;--sub:#6b7785;}
+  *{box-sizing:border-box;}
+  body{font-family:"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;margin:0;background:var(--bg);color:#222;font-size:14px;line-height:1.6;}
+  header{background:var(--navy);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  header h1{font-size:18px;margin:0;font-weight:600;}
+  header .sp{flex:1;}
+  .btn{background:var(--mint);color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px;}
+  .btn.ghost{background:transparent;border:1px solid #fff;}
+  .btn.sm{padding:5px 10px;font-size:12px;}
+  .wrap{max-width:1000px;margin:0 auto;padding:20px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .card h2{font-size:16px;margin:0 0 12px;color:var(--navy);border-left:4px solid var(--mint);padding-left:10px;}
+  .card h3{font-size:14px;margin:18px 0 8px;color:var(--navy);}
+  label{display:block;font-size:12px;color:var(--sub);margin:8px 0 3px;}
+  input[type=text],textarea,select{width:100%;border:1px solid var(--border);border-radius:6px;padding:7px 9px;font:inherit;}
+  textarea{min-height:60px;resize:vertical;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
+  th,td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top;}
+  th{background:#eef2f5;font-weight:600;color:var(--navy);}
+  td.c{text-align:center;width:90px;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;}
+  .pill.med{background:#fde2e2;color:#c0392b;}
+  .pill.pii{background:#fdebd0;color:#a04000;}
+  .pill.biz{background:#e8f6f3;color:#117a65;}
+  .sysbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+  .progress{font-size:12px;color:var(--sub);}
+  .note{font-size:12px;color:var(--sub);}
+  #saveState{font-size:12px;color:#cdd6df;}
+  .center{max-width:420px;margin:80px auto;text-align:center;}
+  @media(max-width:680px){.grid,.grid3{grid-template-columns:1fr;}}
+  @media print{header,.noprint{display:none;}body{background:#fff;}.card{break-inside:avoid;box-shadow:none;}}
+</style>
+</head>
+<body>
+
+<div id="authScreen" class="center">
+  <h1>🛡️ 情報セキュリティ・ガバナンス台帳</h1>
+  <p class="note">管理者(admin)のみ閲覧・編集できます。</p>
+  <button class="btn" onclick="doLogin()">Googleでログイン</button>
+  <p id="authMsg" style="color:#c0392b;margin-top:14px;"></p>
+</div>
+
+<div id="main" style="display:none">
+<header>
+  <h1>🛡️ 情報セキュリティ・ガバナンス台帳</h1>
+  <span class="note" style="color:#cdd6df;">ワイズ株式会社</span>
+  <span class="sp"></span>
+  <span id="saveState"></span>
+  <button class="btn ghost sm noprint" onclick="addSystem()">＋ システム追加</button>
+  <button class="btn ghost sm noprint" onclick="exportJSON()">JSON書出</button>
+  <button class="btn ghost sm noprint" onclick="window.print()">印刷</button>
+  <button class="btn ghost sm noprint" onclick="auth.signOut()">ログアウト</button>
+</header>
+<div class="wrap">
+
+  <div class="card">
+    <h2>① 全社共通方針（土台・1セット）</h2>
+    <p class="note">情報セキュリティの全社的な土台。各システムのシート（②）はここを参照する。根拠: 3省2ガイドライン／厚労省ガイドライン第6.0版。</p>
+    <label>情報セキュリティ基本方針</label>
+    <textarea data-policy="basic"></textarea>
+    <label>組織体制（企画管理者・運用責任者の任命）</label>
+    <textarea data-policy="org"></textarea>
+    <label>共通規程（アクセス管理・インシデント対応規程 等）へのリンク/文書名</label>
+    <textarea data-policy="rules"></textarea>
+  </div>
+
+  <div class="card">
+    <h2>② システム別 責任分界・安全管理シート</h2>
+    <div class="sysbar">
+      <select id="sysSelect" onchange="selectSystem(this.value)" style="max-width:380px"></select>
+      <span id="sysProgress" class="progress"></span>
+      <span class="sp"></span>
+      <button class="btn sm ghost noprint" style="border-color:#c0392b;color:#c0392b" onclick="deleteSystem()">このシート削除</button>
+    </div>
+  </div>
+
+  <div id="sheet"></div>
+</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+firebase.initializeApp(window.FIREBASE_CONFIG);
+const auth=firebase.auth();
+const db=firebase.firestore();
+const COL=db.collection('governance');
+
+const DEMARCATION_ROWS=[
+  {item:'データセンター・物理セキュリティ',g:true,w:false},
+  {item:'サーバ/インフラ/ミドルウェアの実装・更新・運用',g:true,w:false},
+  {item:'基盤の可用性・バックアップ（基盤レベル）',g:true,w:false},
+  {item:'データの登録・編集・削除の管理',g:false,w:true},
+  {item:'アクセス権限の設計・付与（誰が何を見られるか）',g:false,w:true},
+  {item:'アカウント管理（入退社時の追加/削除）',g:false,w:true},
+  {item:'監査ログの有効化・確認',g:false,w:true},
+  {item:'保存リージョンの選択（東京固定）',g:false,w:true},
+  {item:'アプリ画面（UI）の実装・脆弱性対応',g:false,w:true},
+  {item:'暗号化（保存時・通信時）',g:true,w:true},
+];
+const CHECK_ITEMS=[
+  'データは保存時・通信時に暗号化されているか','保存場所（リージョン）は国内（東京）か',
+  'アクセス権が役割（ロール）単位で制御されているか','監査ログが取得・確認できるか',
+  '事業者の適合性資料（サービス仕様適合開示書等）を入手・確認したか','委託先・再委託先の管理状況を把握しているか',
+  'バックアップと復旧手順が定められているか','通常時の運用報告・管理の取り決めがあるか',
+  'AIにデータを入力する場合「学習に使わない」担保があるか','個人情報保護法上の取り扱い（要配慮個人情報の同意等）が整理されているか',
+];
+function blankSystem(o={}){return Object.assign({name:'新規システム',cat:'pii',dataType:'',users:'',vendor:'Google LLC（Google Cloud / Firebase）',serviceType:'PaaS・BaaS（Firestore）',region:'東京（asia-northeast1）',project:'',author:'',reviewer:'',approver:'',date:'',ver:'v1.0',overview:'',demarcation:DEMARCATION_ROWS.map(r=>({...r,note:''})),checklist:CHECK_ITEMS.map(c=>({label:c,done:false,evidence:''})),risks:'',incident:'',vendors:'',order:Date.now()},o);}
+
+let policy={basic:'',org:'',rules:''};
+let systems=[];
+let selected=0;
+let userRole=null;
+const saveTimers={};
+function setSaveState(t){document.getElementById('saveState').textContent=t;}
+
+function doLogin(){auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{document.getElementById('authMsg').textContent=e.message;});}
+auth.onAuthStateChanged(async u=>{
+  if(!u){document.getElementById('authScreen').style.display='';document.getElementById('main').style.display='none';return;}
+  try{
+    const doc=await db.collection('users').doc(u.email).get();
+    userRole=doc.exists?(doc.data().role||'viewer'):null;
+    if(userRole!=='admin'){document.getElementById('authMsg').textContent='この台帳は管理者(admin)のみ利用できます。（現在: '+(userRole||'未登録')+'）';await auth.signOut();return;}
+    document.getElementById('authScreen').style.display='none';
+    document.getElementById('main').style.display='';
+    await loadAll();
+  }catch(e){document.getElementById('authMsg').textContent='読み込みエラー: '+e.message;}
+});
+
+async function loadAll(){
+  const snap=await COL.get();
+  systems=[];policy={basic:'',org:'',rules:''};
+  snap.forEach(d=>{ if(d.id==='_policy'){policy=Object.assign(policy,d.data());} else {systems.push(Object.assign(blankSystem(),d.data(),{_id:d.id}));} });
+  systems.sort((a,b)=>(a.order||0)-(b.order||0));
+  selected=0;renderPolicy();renderSysSelect();renderSheet();
+}
+
+function scheduleSavePolicy(){clearTimeout(saveTimers.policy);setSaveState('保存中…');saveTimers.policy=setTimeout(async()=>{await COL.doc('_policy').set(policy,{merge:true});setSaveState('保存済 ✓');},600);}
+function scheduleSaveSystem(sys){if(!sys._id)return;const k='s_'+sys._id;clearTimeout(saveTimers[k]);setSaveState('保存中…');saveTimers[k]=setTimeout(async()=>{const data={...sys};delete data._id;await COL.doc(sys._id).set(data,{merge:true});setSaveState('保存済 ✓');},600);}
+
+function renderPolicy(){document.querySelectorAll('[data-policy]').forEach(el=>{const k=el.getAttribute('data-policy');el.value=policy[k]||'';el.oninput=()=>{policy[k]=el.value;scheduleSavePolicy();};});}
+function renderSysSelect(){document.getElementById('sysSelect').innerHTML=systems.map((s,i)=>`<option value="${i}" ${i===selected?'selected':''}>${escapeHtml(s.name)}</option>`).join('');}
+function renderProgress(){const s=systems[selected];if(!s){document.getElementById('sysProgress').textContent='';return;}const done=s.checklist.filter(c=>c.done).length;document.getElementById('sysProgress').textContent=`チェック ${done}/${s.checklist.length} 完了`;}
+function escapeHtml(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function catPill(cat){const m={med:['med','医療情報'],pii:['pii','個人情報'],biz:['biz','社外秘']}[cat]||['biz','—'];return `<span class="pill ${m[0]}">${m[1]}</span>`;}
+
+function renderSheet(){
+  const s=systems[selected];const sheet=document.getElementById('sheet');
+  if(!s){sheet.innerHTML='<div class="card note">システムがありません。「＋ システム追加」で作成してください。</div>';return;}
+  const bindText=(el,key)=>{el.value=s[key]||'';el.oninput=()=>{s[key]=el.value;scheduleSaveSystem(s);};};
+  sheet.innerHTML=`
+  <div class="card">
+    <h3>${escapeHtml(s.name)} ${catPill(s.cat)}</h3>
+    <div class="grid">
+      <div><label>システム名</label><input type="text" id="f_name"></div>
+      <div><label>区分</label><select id="f_cat"><option value="med">医療情報（要配慮）</option><option value="pii">個人情報</option><option value="biz">社外秘・業務</option></select></div>
+      <div><label>対象データ</label><input type="text" id="f_dataType"></div>
+      <div><label>利用者範囲（ロール）</label><input type="text" id="f_users"></div>
+      <div><label>サービス事業者</label><input type="text" id="f_vendor"></div>
+      <div><label>サービス類型</label><input type="text" id="f_serviceType"></div>
+      <div><label>保存リージョン</label><input type="text" id="f_region"></div>
+      <div><label>プロジェクト/所在</label><input type="text" id="f_project"></div>
+    </div>
+    <label>システム概要</label><textarea id="f_overview"></textarea>
+    <h3>責任分界表（誰の責任か）</h3>
+    <table><thead><tr><th>管理項目</th><th class="c">Google</th><th class="c">ワイズ</th><th>備考</th></tr></thead><tbody id="demBody"></tbody></table>
+    <h3>遵守事項チェックリスト</h3>
+    <table><thead><tr><th class="c">確認</th><th>要求事項</th><th>根拠・エビデンス</th></tr></thead><tbody id="chkBody"></tbody></table>
+    <div class="grid">
+      <div><label>リスクアセスメント（想定リスク→対策）</label><textarea id="f_risks"></textarea></div>
+      <div><label>非常時（インシデント）対応</label><textarea id="f_incident"></textarea></div>
+    </div>
+    <label>委託先・適合性資料の管理</label><textarea id="f_vendors"></textarea>
+    <h3>承認</h3>
+    <div class="grid3">
+      <div><label>作成者</label><input type="text" id="f_author"></div>
+      <div><label>確認者（運用責任者）</label><input type="text" id="f_reviewer"></div>
+      <div><label>承認者（企画管理者）</label><input type="text" id="f_approver"></div>
+      <div><label>作成日</label><input type="text" id="f_date" placeholder="2026-__-__"></div>
+      <div><label>版</label><input type="text" id="f_ver"></div>
+    </div>
+    <p class="note" style="margin-top:14px">根拠: 厚労省「医療情報システムの安全管理に関するガイドライン 第6.0版」 https://www.mhlw.go.jp/content/10808000/001582980.pdf ／ 3省2ガイドライン。</p>
+  </div>`;
+  ['name','dataType','users','vendor','serviceType','region','project','overview','risks','incident','vendors','author','reviewer','approver','date','ver'].forEach(k=>bindText(document.getElementById('f_'+k),k));
+  const catSel=document.getElementById('f_cat');catSel.value=s.cat||'pii';catSel.onchange=()=>{s.cat=catSel.value;scheduleSaveSystem(s);renderSheet();renderSysSelect();};
+  const dem=document.getElementById('demBody');
+  dem.innerHTML=s.demarcation.map((r,j)=>`<tr><td>${escapeHtml(r.item)}</td><td class="c"><input type="checkbox" id="dg_${j}"></td><td class="c"><input type="checkbox" id="dw_${j}"></td><td><input type="text" id="dn_${j}"></td></tr>`).join('');
+  s.demarcation.forEach((r,j)=>{const g=document.getElementById('dg_'+j),w=document.getElementById('dw_'+j),n=document.getElementById('dn_'+j);g.checked=!!r.g;w.checked=!!r.w;n.value=r.note||'';g.onchange=()=>{r.g=g.checked;scheduleSaveSystem(s);};w.onchange=()=>{r.w=w.checked;scheduleSaveSystem(s);};n.oninput=()=>{r.note=n.value;scheduleSaveSystem(s);};});
+  const chk=document.getElementById('chkBody');
+  chk.innerHTML=s.checklist.map((c,j)=>`<tr><td class="c"><input type="checkbox" id="ck_${j}"></td><td>${escapeHtml(c.label)}</td><td><input type="text" id="ce_${j}"></td></tr>`).join('');
+  s.checklist.forEach((c,j)=>{const k=document.getElementById('ck_'+j),e=document.getElementById('ce_'+j);k.checked=!!c.done;e.value=c.evidence||'';k.onchange=()=>{c.done=k.checked;scheduleSaveSystem(s);renderProgress();};e.oninput=()=>{c.evidence=e.value;scheduleSaveSystem(s);};});
+  renderProgress();
+}
+
+function selectSystem(i){selected=+i;renderSheet();}
+async function addSystem(){const s=blankSystem();const data={...s};const ref=await COL.add(data);s._id=ref.id;systems.push(s);selected=systems.length-1;renderSysSelect();renderSheet();setSaveState('追加しました ✓');}
+async function deleteSystem(){const s=systems[selected];if(!s)return;if(!confirm('このシートを削除しますか？'))return;if(s._id)await COL.doc(s._id).delete();systems.splice(selected,1);selected=0;renderSysSelect();renderSheet();setSaveState('削除しました ✓');}
+function exportJSON(){const blob=new Blob([JSON.stringify({policy,systems},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='security_governance_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
+</script>
+</body>
+</html>
