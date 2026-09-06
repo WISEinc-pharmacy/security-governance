@@ -115,6 +115,7 @@ const CHECK_ITEMS=[
   '事業者の適合性資料（サービス仕様適合開示書等）を入手・確認したか','委託先・再委託先の管理状況を把握しているか',
   'バックアップと復旧手順が定められているか','通常時の運用報告・管理の取り決めがあるか',
   'AIにデータを入力する場合「学習に使わない」担保があるか','個人情報保護法上の取り扱い（要配慮個人情報の同意等）が整理されているか',
+  '非常時（インシデント発生時）の責任分担が事業者と取り決められているか（連絡窓口・復旧SLA・通知義務の分界）',
 ];
 function blankSystem(o={}){return Object.assign({name:'新規システム',cat:'pii',dataType:'',users:'',vendor:'Google LLC（Google Cloud / Firebase）',serviceType:'PaaS・BaaS（Firestore）',region:'東京（asia-northeast1）',project:'',author:'',reviewer:'',approver:'',date:'',ver:'v1.0',overview:'',demarcation:DEMARCATION_ROWS.map(r=>({...r,note:''})),checklist:CHECK_ITEMS.map(c=>({label:c,done:false,evidence:''})),risks:'',incident:'',vendors:'',order:Date.now()},o);}
 
